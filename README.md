@@ -1,1 +1,2 @@
-Game Programming 2 Activity 2
+## **Game Programming 2 - Activity 2**
+
