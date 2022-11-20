@@ -1,42 +1,42 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using Unity.Burst.Intrinsics;
 using UnityEngine;
 
 [System.Serializable]
 public class Entity :  IHealthStatusHandler
 {
-    [Header("Entity Data")]
-    [SerializeField] private string _name;
-    [SerializeField] private EntityType _entityType;
-    private float _moveSpeed; 
+    [Header("Entity Data")] 
+    [SerializeField] protected string _name;
+    [SerializeField] protected EntityType _entityType;
+    protected float _moveSpeed; 
     private Vector3 _currentPosition;
+    protected bool _activateNavigateSkill = false;
 
     public bool IsAlive => CurrentHealth > 0;
-     public float ExpToGive { get; private set; }
+    public float ExpToGive { get; private set; }
     private float _health;
 
     public float CurrentHealth
     {
         get => _health;
-        set => _health = Mathf.Clamp(value, 0, MaxHealth + ShieldAmount);
+        private set => _health = Mathf.Clamp(value, 0, MaxHealth + ShieldAmount);
     }
     public float MaxHealth { get; private set; }
     public float ShieldAmount { get; private set; }
-    public float BuffTimer { get; private set; }
-    public float PrimaryDamage { get; private set; } = 10f;
-    public float SkillDamage { get; private set; } = 20f;
+    public float BuffTime { get; private set; }
+    public float PrimaryDamage { get; private set; }
+    public float SkillDamage { get; private set; }
 
     private readonly Vector2 _constantExperience = new Vector2(0.07f, 2f);
     private float _experience;
-
     public float CurrentExperience
     {
         get => _experience;
-        set
+        private set
         {
-            if (!(_experience >= RequireExpToLevel())) return;
+            if (!(_experience >= RequireExpToLevel()))
+            {
+                _experience = value;
+                return;
+            }
             _level++;
             _experience = 0;
         }
@@ -73,6 +73,8 @@ public class Entity :  IHealthStatusHandler
 
     public virtual void Apply(ApplyType type, IHealthStatusHandler agent)
     {
+        if (!IsAlive) return;
+        
         switch (type)
         {
             case ApplyType.None:
@@ -87,7 +89,7 @@ public class Entity :  IHealthStatusHandler
                 CurrentHealth += agent.SkillDamage;
                 break;
             case ApplyType.Buff:
-                BuffTimer = agent.BuffTimer;
+                BuffTime = agent.BuffTime;
                 break;
             case ApplyType.Shield:
                 CurrentHealth += ShieldAmount;
@@ -95,28 +97,34 @@ public class Entity :  IHealthStatusHandler
         }
         
         if(!IsAlive)
-            OnDie(agent);
+            OnDie(this,agent);
     }
 
-    public virtual void OnDie(IHealthStatusHandler agent)
+    public virtual void OnDie(IHealthStatusHandler agent, IHealthStatusHandler recipient)
+    {
+        recipient.AccumulateExperience(agent);
+    }
+
+    public virtual void AccumulateExperience(IHealthStatusHandler agent)
     {
         CurrentExperience += agent.ExpToGive;
-        Debug.Log("LEVEL UP");
     }
 }
 
 public interface IHealthStatusHandler
 {
     bool IsAlive { get; }
+    float CurrentExperience { get; }
     float ExpToGive { get; }
     float CurrentHealth { get; }
     float MaxHealth { get; }
     float ShieldAmount { get; }
-    float BuffTimer { get; }
+    float BuffTime { get; }
     float PrimaryDamage { get; }
     float SkillDamage { get; }
     void Apply(ApplyType type, IHealthStatusHandler agent);
-    void OnDie(IHealthStatusHandler agent);
+    void OnDie(IHealthStatusHandler agent, IHealthStatusHandler recipient);
+    void AccumulateExperience(IHealthStatusHandler agent);
 }
 
 public enum ApplyType
